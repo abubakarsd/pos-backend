@@ -1,3 +1,16 @@
+const express = require("express");
+const connectDB = require("./config/database");
+const config = require("./config/config");
+const globalErrorHandler = require("./middlewares/globalErrorHandler");
+const cookieParser = require("cookie-parser");
+const cors = require("cors");
+const path = require("path");
+const app = express();
+
+
+const PORT = config.port;
+connectDB();
+
 // Middlewares
 app.use(cors({
     credentials: true,
