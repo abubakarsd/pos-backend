@@ -14,11 +14,29 @@ connectDB();
 // Middlewares
 app.use(cors({
     credentials: true,
-    origin: [
-        'http://localhost:5173',
-        'https://pos-frontend-drab.vercel.app',
-        'https://pos-frontend-git-main-abubakar-haruna-abdulmaliks-projects.vercel.app'
-    ]
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'https://pos-frontend-drab.vercel.app',
+            /^https:\/\/pos-frontend-.*\.vercel\.app$/ // Allow all Vercel preview deployments
+        ];
+
+        const isAllowed = allowedOrigins.some(pattern => {
+            if (pattern instanceof RegExp) {
+                return pattern.test(origin);
+            }
+            return pattern === origin;
+        });
+
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
 }))
 app.use(express.json()); // parse incoming request in json format
 app.use(express.urlencoded({ extended: true })); // New line to parse URL-encoded data
