@@ -4,12 +4,15 @@ const { default: mongoose } = require("mongoose");
 
 const addOrder = async (req, res, next) => {
   try {
+    console.log("Received order data:", JSON.stringify(req.body, null, 2));
     const order = new Order(req.body);
     await order.save();
     res
       .status(201)
       .json({ success: true, message: "Order created!", data: order });
   } catch (error) {
+    console.error("Error creating order:", error.message);
+    console.error("Error details:", error);
     next(error);
   }
 };
