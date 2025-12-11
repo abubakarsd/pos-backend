@@ -20,12 +20,13 @@ const register = async (req, res, next) => {
             return next(error);
         }
 
-
         const user = { name, phone, email, password, role };
         const newUser = User(user);
         await newUser.save();
 
-        res.status(201).json({success: true, message: "New user created!", data: newUser});
+        const populatedUser = await newUser.populate('role');
+
+        res.status(201).json({success: true, message: "New user created!", data: populatedUser});
 
 
     } catch (error) {
@@ -45,7 +46,7 @@ const login = async (req, res, next) => {
             return next(error);
         }
 
-        const isUserPresent = await User.findOne({email});
+        const isUserPresent = await User.findOne({email}).populate('role');
         if(!isUserPresent){
             const error = createHttpError(401, "Invalid Credentials");
             return next(error);
@@ -69,7 +70,16 @@ const login = async (req, res, next) => {
         })
 
         res.status(200).json({success: true, message: "User login successfully!", 
-            data: isUserPresent
+            data: {
+                _id: isUserPresent._id,
+                name: isUserPresent.name,
+                email: isUserPresent.email,
+                phone: isUserPresent.phone,
+                role: isUserPresent.role,
+                isActive: isUserPresent.isActive,
+                createdAt: isUserPresent.createdAt
+            },
+            token: accessToken
         });
 
 
@@ -82,7 +92,7 @@ const login = async (req, res, next) => {
 const getUserData = async (req, res, next) => {
     try {
         
-        const user = await User.findById(req.user._id);
+        const user = await User.findById(req.user._id).populate('role');
         res.status(200).json({success: true, data: user});
 
     } catch (error) {

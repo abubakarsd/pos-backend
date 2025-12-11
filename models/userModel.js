@@ -35,8 +35,14 @@ const userSchema = new mongoose.Schema({
     },
 
     role: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Role',
         required: true
+    },
+
+    isActive: {
+        type: Boolean,
+        default: true,
     }
 }, { timestamps : true })
 
