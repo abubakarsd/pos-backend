@@ -5,11 +5,11 @@ const mongoose = require("mongoose");
 const addCategory = async (req, res, next) => {
   try {
     const { name } = req.body;
-    const imagePath = req.file ? req.file.path : null; // Get the image path from multer
+    const imagePath = req.file ? req.file.path : 'default-category.png'; // Get the image path from multer or use default
 
-    if (!name || !imagePath) {
+    if (!name) {
       return next(
-        createHttpError(400, "Please provide category name and image!")
+        createHttpError(400, "Please provide category name!")
       );
     }
 
