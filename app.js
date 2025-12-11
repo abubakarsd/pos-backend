@@ -20,8 +20,11 @@ app.use(cors({
 
         const allowedOrigins = [
             'http://localhost:5173',
+            'http://localhost:3000',
+            'http://localhost:5174',
             'https://pos-frontend-drab.vercel.app',
-            /^https:\/\/pos-frontend-.*\.vercel\.app$/ // Allow all Vercel preview deployments
+            /^https:\/\/pos-frontend-.*\.vercel\.app$/, // Allow all Vercel preview deployments
+            /^http:\/\/localhost:\d+$/ // Allow all localhost ports
         ];
 
         const isAllowed = allowedOrigins.some(pattern => {
