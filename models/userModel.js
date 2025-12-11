@@ -43,7 +43,22 @@ const userSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true,
-    }
+    },
+
+    lastLogin: {
+        type: Date,
+        default: null,
+    },
+
+    lastLoginLocation: {
+        type: String,
+        default: null,
+    },
+
+    lastLogout: {
+        type: Date,
+        default: null,
+    },
 }, { timestamps : true })
 
 userSchema.pre('save', async function (next) {

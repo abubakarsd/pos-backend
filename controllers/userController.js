@@ -1,5 +1,6 @@
 const createHttpError = require("http-errors");
 const User = require("../models/userModel");
+const LoginSession = require("../models/loginSessionModel");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const config = require("../config/config");
@@ -58,12 +59,38 @@ const login = async (req, res, next) => {
             return next(error);
         }
 
+        // Token expires in 7 days
         const accessToken = jwt.sign({_id: isUserPresent._id}, config.accessTokenSecret, {
-            expiresIn : '1d'
+            expiresIn : '7d'
         });
 
+        // Get location from IP (or from request headers if available)
+        const location = req.headers['x-location'] || 'Unknown Location';
+        const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'Unknown';
+        const userAgent = req.headers['user-agent'] || 'Unknown';
+
+        // Create login session record
+        const loginSession = new LoginSession({
+            user: isUserPresent._id,
+            loginTime: new Date(),
+            location: location,
+            ipAddress: ipAddress,
+            userAgent: userAgent,
+            isActive: true
+        });
+        await loginSession.save();
+
+        // Update user's last login info
+        await User.findByIdAndUpdate(
+            isUserPresent._id,
+            {
+                lastLogin: new Date(),
+                lastLoginLocation: location
+            }
+        );
+
         res.cookie('accessToken', accessToken, {
-            maxAge: 1000 * 60 * 60 *24 * 30,
+            maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
             httpOnly: true,
             sameSite: 'none',
             secure: true
@@ -77,6 +104,8 @@ const login = async (req, res, next) => {
                 phone: isUserPresent.phone,
                 role: isUserPresent.role,
                 isActive: isUserPresent.isActive,
+                lastLogin: new Date(),
+                lastLoginLocation: location,
                 createdAt: isUserPresent.createdAt
             },
             token: accessToken
@@ -102,10 +131,63 @@ const getUserData = async (req, res, next) => {
 
 const logout = async (req, res, next) => {
     try {
+        // End the active login session
+        await LoginSession.findOneAndUpdate(
+            { user: req.user._id, isActive: true },
+            { 
+                logoutTime: new Date(),
+                isActive: false 
+            },
+            { sort: { loginTime: -1 } }
+        );
+
+        // Update user's last logout time
+        await User.findByIdAndUpdate(
+            req.user._id,
+            { lastLogout: new Date() }
+        );
         
         res.clearCookie('accessToken');
         res.status(200).json({success: true, message: "User logout successfully!"});
 
+    } catch (error) {
+        next(error);
+    }
+}
+
+const getUserSessions = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        
+        const sessions = await LoginSession.find({ user: id })
+            .sort({ loginTime: -1 })
+            .limit(10);
+        
+        res.status(200).json({success: true, data: sessions});
+    } catch (error) {
+        next(error);
+    }
+}
+
+const getUserActivityDetails = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        
+        const user = await User.findById(id).populate('role').select('-password');
+        if (!user) {
+            return next(createHttpError(404, "User not found!"));
+        }
+
+        const sessions = await LoginSession.find({ user: id })
+            .sort({ loginTime: -1 });
+        
+        res.status(200).json({
+            success: true, 
+            data: {
+                user,
+                sessions
+            }
+        });
     } catch (error) {
         next(error);
     }
@@ -164,4 +246,4 @@ const deleteUser = async (req, res, next) => {
 
 
 
-module.exports = { register, login, getUserData, logout, getAllUsers, updateUserStatus, deleteUser }
+module.exports = { register, login, getUserData, logout, getAllUsers, updateUserStatus, deleteUser, getUserSessions, getUserActivityDetails }
