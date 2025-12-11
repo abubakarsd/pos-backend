@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const createHttpError = require('http-errors');
-const isVerifiedUser = require('../middlewares/tokenVerification');
+const { isVerifiedUser } = require('../middlewares/tokenVerification');
 const upload = require('../middlewares/uploadMiddleware');
 
 const uploadRoute = express.Router();
