@@ -111,7 +111,57 @@ const logout = async (req, res, next) => {
     }
 }
 
+const getAllUsers = async (req, res, next) => {
+    try {
+        const users = await User.find().populate('role').select('-password');
+        res.status(200).json({success: true, data: users});
+    } catch (error) {
+        next(error);
+    }
+}
+
+const updateUserStatus = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { isActive } = req.body;
+
+        if (typeof isActive !== 'boolean') {
+            return next(createHttpError(400, "isActive must be a boolean!"));
+        }
+
+        const user = await User.findByIdAndUpdate(
+            id,
+            { isActive },
+            { new: true }
+        ).populate('role');
+
+        if (!user) {
+            return next(createHttpError(404, "User not found!"));
+        }
+
+        res.status(200).json({success: true, message: "User status updated!", data: user});
+    } catch (error) {
+        next(error);
+    }
+}
+
+const deleteUser = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const user = await User.findByIdAndDelete(id);
+
+        if (!user) {
+            return next(createHttpError(404, "User not found!"));
+        }
+
+        res.status(200).json({success: true, message: "User deleted successfully!"});
+    } catch (error) {
+        next(error);
+    }
+}
 
 
 
-module.exports = { register, login, getUserData, logout }
+
+module.exports = { register, login, getUserData, logout, getAllUsers, updateUserStatus, deleteUser }
