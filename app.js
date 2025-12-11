@@ -23,7 +23,9 @@ app.use(cors({
             'http://localhost:3000',
             'http://localhost:5174',
             'https://pos-frontend-drab.vercel.app',
+            'https://pos-system-ten-cyan.vercel.app',
             /^https:\/\/pos-frontend-.*\.vercel\.app$/, // Allow all Vercel preview deployments
+            /^https:\/\/pos-system-.*\.vercel\.app$/, // Allow all pos-system Vercel deployments
             /^http:\/\/localhost:\d+$/ // Allow all localhost ports
         ];
 
