@@ -45,29 +45,29 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
 
     try {
-        
+
         const { email, password } = req.body;
 
-        if(!email || !password) {
+        if (!email || !password) {
             const error = createHttpError(400, "All fields are required!");
             return next(error);
         }
 
-        const isUserPresent = await User.findOne({email}).populate('role');
-        if(!isUserPresent){
+        const isUserPresent = await User.findOne({ email }).populate('role');
+        if (!isUserPresent) {
             const error = createHttpError(401, "Invalid Credentials");
             return next(error);
         }
 
         const isMatch = await bcrypt.compare(password, isUserPresent.password);
-        if(!isMatch){
+        if (!isMatch) {
             const error = createHttpError(401, "Invalid Credentials");
             return next(error);
         }
 
         // Token expires in 7 days
-        const accessToken = jwt.sign({_id: isUserPresent._id}, config.accessTokenSecret, {
-            expiresIn : '7d'
+        const accessToken = jwt.sign({ _id: isUserPresent._id }, config.accessTokenSecret, {
+            expiresIn: '7d'
         });
 
         // Get location from IP (or from request headers if available)
@@ -102,7 +102,8 @@ const login = async (req, res, next) => {
             secure: true
         })
 
-        res.status(200).json({success: true, message: "User login successfully!", 
+        res.status(200).json({
+            success: true, message: "User login successfully!",
             data: {
                 _id: isUserPresent._id,
                 name: isUserPresent.name,
@@ -126,9 +127,9 @@ const login = async (req, res, next) => {
 
 const getUserData = async (req, res, next) => {
     try {
-        
+
         const user = await User.findById(req.user._id).populate('role');
-        res.status(200).json({success: true, data: user});
+        res.status(200).json({ success: true, data: user });
 
     } catch (error) {
         next(error);
@@ -140,9 +141,9 @@ const logout = async (req, res, next) => {
         // End the active login session
         await LoginSession.findOneAndUpdate(
             { user: req.user._id, isActive: true },
-            { 
+            {
                 logoutTime: new Date(),
-                isActive: false 
+                isActive: false
             },
             { sort: { loginTime: -1 } }
         );
@@ -152,9 +153,9 @@ const logout = async (req, res, next) => {
             req.user._id,
             { lastLogout: new Date() }
         );
-        
+
         res.clearCookie('accessToken');
-        res.status(200).json({success: true, message: "User logout successfully!"});
+        res.status(200).json({ success: true, message: "User logout successfully!" });
 
     } catch (error) {
         next(error);
@@ -164,12 +165,12 @@ const logout = async (req, res, next) => {
 const getUserSessions = async (req, res, next) => {
     try {
         const { id } = req.params;
-        
+
         const sessions = await LoginSession.find({ user: id })
             .sort({ loginTime: -1 })
             .limit(10);
-        
-        res.status(200).json({success: true, data: sessions});
+
+        res.status(200).json({ success: true, data: sessions });
     } catch (error) {
         next(error);
     }
@@ -178,7 +179,7 @@ const getUserSessions = async (req, res, next) => {
 const getUserActivityDetails = async (req, res, next) => {
     try {
         const { id } = req.params;
-        
+
         const user = await User.findById(id).populate('role').select('-password');
         if (!user) {
             return next(createHttpError(404, "User not found!"));
@@ -186,9 +187,9 @@ const getUserActivityDetails = async (req, res, next) => {
 
         const sessions = await LoginSession.find({ user: id })
             .sort({ loginTime: -1 });
-        
+
         res.status(200).json({
-            success: true, 
+            success: true,
             data: {
                 user,
                 sessions
@@ -202,7 +203,7 @@ const getUserActivityDetails = async (req, res, next) => {
 const getAllUsers = async (req, res, next) => {
     try {
         const users = await User.find().populate('role').select('-password');
-        res.status(200).json({success: true, data: users});
+        res.status(200).json({ success: true, data: users });
     } catch (error) {
         next(error);
     }
@@ -227,7 +228,7 @@ const updateUserStatus = async (req, res, next) => {
             return next(createHttpError(404, "User not found!"));
         }
 
-        res.status(200).json({success: true, message: "User status updated!", data: user});
+        res.status(200).json({ success: true, message: "User status updated!", data: user });
     } catch (error) {
         next(error);
     }
@@ -243,7 +244,7 @@ const deleteUser = async (req, res, next) => {
             return next(createHttpError(404, "User not found!"));
         }
 
-        res.status(200).json({success: true, message: "User deleted successfully!"});
+        res.status(200).json({ success: true, message: "User deleted successfully!" });
     } catch (error) {
         next(error);
     }
@@ -252,7 +253,7 @@ const deleteUser = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { name, email, phone, role, isActive } = req.body;
+        const { name, email, phone, role, isActive, password } = req.body;
 
         if (!name || !email || !phone) {
             return next(createHttpError(400, "Name, email, and phone are required!"));
@@ -266,6 +267,12 @@ const updateUser = async (req, res, next) => {
             ...(typeof isActive !== 'undefined' && { isActive })
         };
 
+        // Handle password update if provided
+        if (password && password.trim() !== "") {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            updateData.password = hashedPassword;
+        }
+
         const user = await User.findByIdAndUpdate(
             id,
             updateData,
@@ -276,7 +283,7 @@ const updateUser = async (req, res, next) => {
             return next(createHttpError(404, "User not found!"));
         }
 
-        res.status(200).json({success: true, message: "User updated successfully!", data: user});
+        res.status(200).json({ success: true, message: "User updated successfully!", data: user });
     } catch (error) {
         next(error);
     }
