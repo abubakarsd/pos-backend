@@ -243,7 +243,40 @@ const deleteUser = async (req, res, next) => {
     }
 }
 
+const updateUser = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { name, email, phone, role, isActive } = req.body;
+
+        if (!name || !email || !phone) {
+            return next(createHttpError(400, "Name, email, and phone are required!"));
+        }
+
+        const updateData = {
+            name,
+            email,
+            phone,
+            ...(role && { role }),
+            ...(typeof isActive !== 'undefined' && { isActive })
+        };
+
+        const user = await User.findByIdAndUpdate(
+            id,
+            updateData,
+            { new: true, runValidators: true }
+        ).populate('role');
+
+        if (!user) {
+            return next(createHttpError(404, "User not found!"));
+        }
+
+        res.status(200).json({success: true, message: "User updated successfully!", data: user});
+    } catch (error) {
+        next(error);
+    }
+}
 
 
 
-module.exports = { register, login, getUserData, logout, getAllUsers, updateUserStatus, deleteUser, getUserSessions, getUserActivityDetails }
+
+module.exports = { register, login, getUserData, logout, getAllUsers, updateUserStatus, deleteUser, getUserSessions, getUserActivityDetails, updateUser }
