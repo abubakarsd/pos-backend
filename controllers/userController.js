@@ -1,35 +1,41 @@
 const createHttpError = require("http-errors");
 const User = require("../models/userModel");
 const LoginSession = require("../models/loginSessionModel");
+const Role = require("../models/roleModel"); // Import Role model
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const config = require("../config/config");
 
 const register = async (req, res, next) => {
     try {
-
         const { name, phone, email, password, role } = req.body;
 
-        if(!name || !phone || !email || !password || !role){
+        if (!name || !phone || !email || !password || !role) {
             const error = createHttpError(400, "All fields are required!");
             return next(error);
         }
 
-        const isUserPresent = await User.findOne({email});
-        if(isUserPresent){
-            const error = createHttpError(400, "User already exist!");
+        const isUserPresent = await User.findOne({ email });
+        if (isUserPresent) {
+            const error = createHttpError(400, "User already exists!");
             return next(error);
         }
 
-        const user = { name, phone, email, password, role };
+        const roleExists = await Role.findById(role);
+        if (!roleExists) {
+            const error = createHttpError(400, "Invalid role provided!");
+            return next(error);
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const user = { name, phone, email, password: hashedPassword, role };
         const newUser = User(user);
         await newUser.save();
 
         const populatedUser = await newUser.populate('role');
 
-        res.status(201).json({success: true, message: "New user created!", data: populatedUser});
-
-
+        res.status(201).json({ success: true, message: "New user created!", data: populatedUser });
     } catch (error) {
         next(error);
     }
