@@ -83,4 +83,24 @@ const updateDish = async (req, res, next) => {
   }
 };
 
-module.exports = { addDish, getDishes, updateDish };
+const deleteDish = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return next(createHttpError(404, "Invalid dish ID!"));
+    }
+
+    const deletedDish = await Dish.findByIdAndDelete(id);
+
+    if (!deletedDish) {
+      return next(createHttpError(404, "Dish not found!"));
+    }
+
+    res.status(200).json({ success: true, message: "Dish deleted!", data: deletedDish });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { addDish, getDishes, updateDish, deleteDish };
