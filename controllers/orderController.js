@@ -4,15 +4,37 @@ const { default: mongoose } = require("mongoose");
 
 const addOrder = async (req, res, next) => {
   try {
-    console.log("Received order data:", JSON.stringify(req.body, null, 2));
-    const order = new Order(req.body);
+    // req.user is populated by verifyToken middleware
+    const serverId = req.user.id;
+    const { items, bills, customerDetails, paymentMethod, paymentData } = req.body;
+
+    // Per user request: "complete payment should send item to Orders... paid for is completed no Pending"
+    // We assume orders coming in via this API are fully paid/completed.
+    const orderStatus = "served"; // Using 'served' to map to 'Completed' in frontend config
+
+    const orderData = {
+      customerDetails: customerDetails || { name: "Walk-in", phone: "0000000000", guests: 1 }, // Default if not provided
+      items,
+      bills,
+      orderStatus,
+      paymentMethod,
+      paymentData,
+      server: serverId, // Set the server field
+      // table: req.body.table // Optional, if provided
+    };
+
+    if (req.body.table) {
+      orderData.table = req.body.table;
+    }
+
+    const order = new Order(orderData);
     await order.save();
+
     res
       .status(201)
       .json({ success: true, message: "Order created!", data: order });
   } catch (error) {
-    console.error("Error creating order:", error.message);
-    console.error("Error details:", error);
+    console.error("Error creating order:", error);
     next(error);
   }
 };
@@ -40,7 +62,7 @@ const getOrderById = async (req, res, next) => {
 
 const getOrders = async (req, res, next) => {
   try {
-    const orders = await Order.find().populate("table");
+    const orders = await Order.find().populate("table").populate("server", "name"); // Populate server name
     res.status(200).json({ data: orders });
   } catch (error) {
     next(error);

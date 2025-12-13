@@ -20,7 +20,8 @@ const orderSchema = new mongoose.Schema({
         totalWithTax: { type: Number, required: true }
     },
     items: [],
-    table: { type: mongoose.Schema.Types.ObjectId, ref: "Table", required: false }, // Made optional
+    table: { type: mongoose.Schema.Types.ObjectId, ref: "Table", required: false },
+    server: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Verified User who created the order
     paymentMethod: String,
     paymentData: {
         razorpay_order_id: String,
