@@ -2,7 +2,7 @@ const createHttpError = require("http-errors");
 const User = require("../models/userModel");
 const LoginSession = require("../models/loginSessionModel");
 const Role = require("../models/roleModel"); // Import Role model
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const config = require("../config/config");
 

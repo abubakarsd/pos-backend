@@ -1,31 +1,31 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema({
-    name : {
+    name: {
         type: String,
         required: true,
     },
 
-    email : {
+    email: {
         type: String,
         required: true,
         validate: {
             validator: function (v) {
                 return /\S+@\S+\.\S+/.test(v);
             },
-            message : "Email must be in valid format!"
+            message: "Email must be in valid format!"
         }
     },
 
     phone: {
-        type : Number,
+        type: Number,
         required: true,
         validate: {
             validator: function (v) {
                 return /\d{10}/.test(v);
             },
-            message : "Phone number must be a 10-digit number!"
+            message: "Phone number must be a 10-digit number!"
         }
     },
 
@@ -59,10 +59,10 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null,
     },
-}, { timestamps : true })
+}, { timestamps: true })
 
 userSchema.pre('save', async function (next) {
-    if(!this.isModified('password')){
+    if (!this.isModified('password')) {
         next();
     }
 
