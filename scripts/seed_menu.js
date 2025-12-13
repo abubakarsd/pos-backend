@@ -39,14 +39,13 @@ const seedDB = async () => {
         console.log("Seeding Categories...");
         const categoryMap = {};
         for (const cat of categories) {
-            let category = await Category.findOne({ name: cat.name });
-            if (!category) {
-                category = new Category(cat);
-                await category.save();
-                console.log(`Created category: ${cat.name}`);
-            } else {
-                console.log(`Category exists: ${cat.name}`);
-            }
+            // Update image even if category exists to fix "default-category.png"
+            let category = await Category.findOneAndUpdate(
+                { name: cat.name },
+                { image: cat.image },
+                { new: true, upsert: true }
+            );
+            console.log(`Processed category: ${cat.name}`);
             categoryMap[cat.name] = category._id;
         }
 
