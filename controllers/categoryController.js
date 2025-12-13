@@ -30,7 +30,29 @@ const addCategory = async (req, res, next) => {
 
 const getCategories = async (req, res, next) => {
   try {
-    const categories = await Category.find();
+    const categories = await Category.aggregate([
+      {
+        $lookup: {
+          from: "dishes",
+          localField: "_id",
+          foreignField: "category",
+          as: "dishes",
+        },
+      },
+      {
+        $addFields: {
+          itemCount: { $size: "$dishes" },
+        },
+      },
+      {
+        $project: {
+          dishes: 0, // Exclude the dishes array to keep response light
+        },
+      },
+      {
+        $sort: { name: 1 } // Optional: sort by name
+      }
+    ]);
     res.status(200).json({ success: true, data: categories });
   } catch (error) {
     next(error);
