@@ -12,7 +12,12 @@ const addOrder = async (req, res, next) => {
     // We assume orders coming in via this API are fully paid/completed.
     const orderStatus = "served"; // Using 'served' to map to 'Completed' in frontend config
 
+    // Generate Custom Order ID
+    const randomNum = Math.floor(10000 + Math.random() * 90000); // 5 digit random number
+    const orderId = `ORD-${randomNum}`;
+
     const orderData = {
+      orderId,
       customerDetails: customerDetails || { name: "Walk-in", phone: "0000000000", guests: 1 }, // Default if not provided
       items,
       bills,

@@ -6,6 +6,7 @@ const orderSchema = new mongoose.Schema({
         phone: { type: String, required: true }, // Fixed typo: requried -> required
         guests: { type: Number, required: true },
     },
+    orderId: { type: String, required: true, unique: true }, // Custom human-readable ID
     orderStatus: {
         type: String,
         required: true
