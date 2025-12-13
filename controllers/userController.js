@@ -255,17 +255,12 @@ const updateUser = async (req, res, next) => {
         const { id } = req.params;
         const { name, email, phone, role, isActive, password } = req.body;
 
-        if (!name || !email || !phone) {
-            return next(createHttpError(400, "Name, email, and phone are required!"));
-        }
-
-        const updateData = {
-            name,
-            email,
-            phone,
-            ...(role && { role }),
-            ...(typeof isActive !== 'undefined' && { isActive })
-        };
+        const updateData = {};
+        if (name) updateData.name = name;
+        if (email) updateData.email = email;
+        if (phone) updateData.phone = phone;
+        if (role) updateData.role = role;
+        if (typeof isActive !== 'undefined') updateData.isActive = isActive;
 
         // Handle password update if provided
         if (password && password.trim() !== "") {

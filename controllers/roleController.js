@@ -3,7 +3,31 @@ const Role = require("../models/roleModel");
 
 const getAllRoles = async (req, res, next) => {
     try {
-        const roles = await Role.find({ isActive: true }).sort({ createdAt: -1 });
+        const roles = await Role.aggregate([
+            {
+                $match: { isActive: true }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "_id",
+                    foreignField: "role",
+                    as: "users"
+                }
+            },
+            {
+                $project: {
+                    name: 1,
+                    description: 1,
+                    permissions: 1,
+                    createdAt: 1,
+                    userCount: { $size: "$users" }
+                }
+            },
+            {
+                $sort: { createdAt: -1 }
+            }
+        ]);
         res.status(200).json({ success: true, data: roles });
     } catch (error) {
         next(error);
