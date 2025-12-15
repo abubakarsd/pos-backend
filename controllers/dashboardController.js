@@ -16,19 +16,22 @@ exports.getDashboardStats = async (req, res, next) => {
             switch (timeframe) {
                 case 'today':
                     return { $gte: start };
-                case 'yesterday':
+                case 'yesterday': {
                     const yesterdayStart = new Date(start);
                     yesterdayStart.setDate(start.getDate() - 1);
                     const yesterdayEnd = new Date(start);
                     return { $gte: yesterdayStart, $lt: yesterdayEnd };
-                case 'last_7_days':
+                }
+                case 'last_7_days': {
                     const last7 = new Date(start);
                     last7.setDate(start.getDate() - 6);
                     return { $gte: last7 };
-                case 'last_30_days':
+                }
+                case 'last_30_days': {
                     const last30 = new Date(start);
                     last30.setDate(start.getDate() - 29);
                     return { $gte: last30 };
+                }
                 case 'all_time':
                     return null;
                 default:
@@ -200,6 +203,7 @@ exports.getDashboardStats = async (req, res, next) => {
             }
         });
     } catch (error) {
-        next(error);
+        console.error("Dashboard Stats Error:", error);
+        res.status(500).json({ success: false, message: error.message });
     }
 };
