@@ -70,7 +70,7 @@ exports.getDashboardStats = async (req, res, next) => {
                     };
                 }
                 case 'all_time':
-                    return { current: {}, previous: null };
+                    return { current: null, previous: null };
                 default:
                     // Default to today
                     return {
