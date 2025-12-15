@@ -7,72 +7,139 @@ exports.getDashboardStats = async (req, res, next) => {
         const totalUsers = await User.countDocuments();
         const totalMenu = await Dish.countDocuments();
 
-        // Helper to get date date range
-        const getDateRange = (timeframe) => {
+        // Helper to get current and previous date ranges
+        const getDateRanges = (timeframe) => {
             const now = new Date();
             const start = new Date();
             start.setHours(0, 0, 0, 0);
 
             switch (timeframe) {
-                case 'today':
-                    return { $gte: start };
+                case 'today': {
+                    // Current: Today
+                    // Previous: Yesterday
+                    const prevStart = new Date(start);
+                    prevStart.setDate(start.getDate() - 1);
+                    const prevEnd = new Date(start);
+
+                    return {
+                        current: { $gte: start },
+                        previous: { $gte: prevStart, $lt: prevEnd }
+                    };
+                }
                 case 'yesterday': {
-                    const yesterdayStart = new Date(start);
-                    yesterdayStart.setDate(start.getDate() - 1);
-                    const yesterdayEnd = new Date(start);
-                    return { $gte: yesterdayStart, $lt: yesterdayEnd };
+                    // Current: Yesterday
+                    // Previous: Day before yesterday
+                    const currStart = new Date(start);
+                    currStart.setDate(start.getDate() - 1);
+                    const currEnd = new Date(start);
+
+                    const prevStart = new Date(currStart);
+                    prevStart.setDate(currStart.getDate() - 1);
+
+                    return {
+                        current: { $gte: currStart, $lt: currEnd },
+                        previous: { $gte: prevStart, $lt: currStart }
+                    };
                 }
                 case 'last_7_days': {
-                    const last7 = new Date(start);
-                    last7.setDate(start.getDate() - 6);
-                    return { $gte: last7 };
+                    // Current: Last 7 days
+                    // Previous: 7 days before that
+                    const currStart = new Date(start);
+                    currStart.setDate(start.getDate() - 6);
+
+                    const prevStart = new Date(currStart);
+                    prevStart.setDate(currStart.getDate() - 7);
+
+                    return {
+                        current: { $gte: currStart },
+                        previous: { $gte: prevStart, $lt: currStart }
+                    };
                 }
                 case 'last_30_days': {
-                    const last30 = new Date(start);
-                    last30.setDate(start.getDate() - 29);
-                    return { $gte: last30 };
+                    // Current: Last 30 days
+                    // Previous: 30 days before that
+                    const currStart = new Date(start);
+                    currStart.setDate(start.getDate() - 29);
+
+                    const prevStart = new Date(currStart);
+                    prevStart.setDate(currStart.getDate() - 30);
+
+                    return {
+                        current: { $gte: currStart },
+                        previous: { $gte: prevStart, $lt: currStart }
+                    };
                 }
                 case 'all_time':
-                    return null;
+                    return { current: {}, previous: null };
                 default:
-                    return { $gte: start }; // Default to today
+                    // Default to today
+                    return {
+                        current: { $gte: start },
+                        previous: null
+                    };
             }
         };
 
         const { salesTimeframe, ordersTimeframe } = req.query;
 
-        // Helper for start of day (still used by hourly traffic)
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
+        // 0. Sales Stats (Filtered with Comparison)
+        const salesRanges = getDateRanges(salesTimeframe || 'today');
 
-        // Helper for last 7 days (still used by weekly sales)
-        const last7Days = new Date();
-        last7Days.setDate(last7Days.getDate() - 6);
-        last7Days.setHours(0, 0, 0, 0);
-
-        // 0. Sales Stats (Filtered)
-        const salesDateFilter = getDateRange(salesTimeframe || 'today');
+        // Current Sales
         const salesMatch = { orderStatus: { $ne: 'cancelled' } };
-        if (salesDateFilter) salesMatch.createdAt = salesDateFilter;
-
+        if (salesRanges.current) salesMatch.createdAt = salesRanges.current;
         const salesStatsResult = await Order.aggregate([
             { $match: salesMatch },
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: "$bills.totalWithTax" }
-                }
-            }
+            { $group: { _id: null, total: { $sum: "$bills.totalWithTax" } } }
         ]);
         const filteredSales = salesStatsResult.length > 0 ? salesStatsResult[0].total : 0;
 
-        // Orders Stats (Filtered)
-        const ordersDateFilter = getDateRange(ordersTimeframe || 'all_time'); // Default to all time
-        const ordersMatch = {}; // Count all including cancelled? Usually filtering implies valid orders but usually total orders means count of creations. Let's keep it simple: count all.
-        // Actually, for "Total Orders" we usually count everything, but if filtering by date we should apply date.
-        if (ordersDateFilter) ordersMatch.createdAt = ordersDateFilter;
+        // Previous Sales (for percentage)
+        let salesChange = 0;
+        if (salesRanges.previous) {
+            const prevSalesMatch = { orderStatus: { $ne: 'cancelled' }, createdAt: salesRanges.previous };
+            const prevSalesResult = await Order.aggregate([
+                { $match: prevSalesMatch },
+                { $group: { _id: null, total: { $sum: "$bills.totalWithTax" } } }
+            ]);
+            const prevSales = prevSalesResult.length > 0 ? prevSalesResult[0].total : 0;
 
+            if (prevSales > 0) {
+                salesChange = ((filteredSales - prevSales) / prevSales) * 100;
+            } else if (filteredSales > 0) {
+                salesChange = 100; // 0 to something is 100% increase logic
+            }
+        }
+
+        // Orders Stats (Filtered with Comparison)
+        const ordersRanges = getDateRanges(ordersTimeframe || 'all_time');
+
+        // Current Orders
+        const ordersMatch = {};
+        if (ordersRanges.current) ordersMatch.createdAt = ordersRanges.current;
         const filteredOrders = await Order.countDocuments(ordersMatch);
+
+        // Previous Orders (for percentage)
+        let ordersChange = 0;
+        if (ordersRanges.previous) {
+            const prevOrdersMatch = { createdAt: ordersRanges.previous };
+            const prevOrdersCount = await Order.countDocuments(prevOrdersMatch);
+
+            if (prevOrdersCount > 0) {
+                ordersChange = ((filteredOrders - prevOrdersCount) / prevOrdersCount) * 100;
+            } else if (filteredOrders > 0) {
+                ordersChange = 100;
+            }
+        }
+
+        // Hourly helper (start of today)
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        // Weekly helper (last 7 days)
+        const last7Days = new Date();
+        last7Days.setDate(last7Days.getDate() - 6);
+        last7Days.setHours(0, 0, 0, 0);
 
         // 1. Weekly Sales (Last 7 Days)
         const weeklySales = await Order.aggregate([
@@ -84,7 +151,7 @@ exports.getDashboardStats = async (req, res, next) => {
             },
             {
                 $group: {
-                    _id: { $dateToString: { format: "%a", date: "$createdAt" } }, // Mon, Tue...
+                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
                     sales: { $sum: "$bills.totalWithTax" },
                     date: { $first: "$createdAt" } // Keep date for sorting
                 }
@@ -191,7 +258,9 @@ exports.getDashboardStats = async (req, res, next) => {
                 totalUsers,
                 totalMenu,
                 todaySales: filteredSales,
+                todaySalesChange: salesChange,
                 totalOrders: filteredOrders,
+                totalOrdersChange: ordersChange,
                 weeklySales,
                 hourlyTraffic,
                 categoryPerformance,
