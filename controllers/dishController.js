@@ -39,8 +39,76 @@ const addDish = async (req, res, next) => {
 
 const getDishes = async (req, res, next) => {
   try {
-    const dishes = await Dish.find().populate("category");
-    res.status(200).json({ success: true, data: dishes });
+    const { page = 1, limit = 10, category, search, startsWith } = req.query;
+
+    const query = {};
+
+    // Filter by Category
+    if (category && category !== 'All') {
+      // If category is an ObjectId, use it directly. If name, we might need to look it up or assuming frontend sends names?
+      // The current frontend uses names for filtering in some places, but the Dish model stores ObjectId ref.
+      // However, POSContext fetchInitialData mapped category object to name string on frontend.
+      // But standard way is to filter by ID.
+      // Let's check how frontend sends it. Plan said "category name or ID".
+      // If the frontend sends a name, we need to find the Category ID first. 
+      // OR populate category and filter in memory (bad for pagination).
+      // Best approach: Frontend should send ID if possible, or we look it up.
+      // For now, let's assume we might receive a Category Name and need to match dishes whose populated category has that name?
+      // That's complex in Mongo.
+      // Simpler: The Dish model stores `category` as ObjectId.
+      // If `req.query.category` is a valid ObjectId, use it.
+      // If it's a string like "Mains", we need to find the Category doc first.
+
+      const Category = require("../models/categoryModel"); // unexpected require, but needed if filtering by name
+      const mongoose = require("mongoose");
+
+      if (mongoose.Types.ObjectId.isValid(category)) {
+        query.category = category;
+      } else {
+        // It's a name, find the category ID
+        const categoryDoc = await Category.findOne({ name: category });
+        if (categoryDoc) {
+          query.category = categoryDoc._id;
+        } else {
+          // Category name not found, return empty or ignore? Return empty is safer.
+          query.category = null;
+        }
+      }
+    }
+
+    // Search by Name (Regex)
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+
+    // Starts With (for Alphabet filter)
+    if (startsWith) {
+      query.name = { $regex: `^${startsWith}`, $options: "i" };
+    }
+
+    const total = await Dish.countDocuments(query);
+
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const dishes = await Dish.find(query)
+      .populate("category")
+      .skip(skip)
+      .limit(limitNum)
+      .sort({ createdAt: -1 }); // Newest first
+
+    res.status(200).json({
+      success: true,
+      data: dishes,
+      pagination: {
+        total,
+        page: pageNum,
+        pages: Math.ceil(total / limitNum),
+        limit: limitNum
+      }
+    });
   } catch (error) {
     next(error);
   }
