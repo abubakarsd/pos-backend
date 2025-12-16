@@ -31,6 +31,7 @@ const roleSchema = new mongoose.Schema({
                     'manage_settings',
                     'view_tables',
                     'manage_tables',
+                    'manage_menu',
                 ];
                 return v.every(perm => validPermissions.includes(perm));
             },
