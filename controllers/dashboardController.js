@@ -348,10 +348,23 @@ exports.getAnalyticsStats = async (req, res, next) => {
             { $match: dateMatch },
             { $unwind: "$items" },
             {
+                $project: {
+                    categoryName: {
+                        $cond: {
+                            if: { $eq: [{ $type: "$items.category" }, "object"] },
+                            then: "$items.category.name",
+                            else: "$items.category"
+                        }
+                    },
+                    price: "$items.price",
+                    quantity: "$items.quantity"
+                }
+            },
+            {
                 $group: {
-                    _id: "$items.category",
-                    revenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
-                    value: { $sum: "$items.quantity" }
+                    _id: "$categoryName",
+                    revenue: { $sum: { $multiply: ["$price", "$quantity"] } },
+                    value: { $sum: "$quantity" }
                 }
             },
             { $match: { _id: { $ne: null } } },
