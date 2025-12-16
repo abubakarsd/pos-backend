@@ -6,7 +6,7 @@ const {
     updateInventoryItem,
     deleteInventoryItem,
 } = require("../controllers/inventoryController");
-const verifyToken = require("../middlewares/authMiddleware");
+const { isVerifiedUser: verifyToken } = require("../middlewares/tokenVerification");
 
 // Protected routes
 router.get("/", verifyToken, getInventory);
