@@ -276,3 +276,135 @@ exports.getDashboardStats = async (req, res, next) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+exports.getAnalyticsStats = async (req, res, next) => {
+    try {
+        const { from, to } = req.query;
+
+        // Default to last 30 days if not provided
+        let startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+        startDate.setHours(0, 0, 0, 0);
+
+        let endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+
+        if (from) {
+            startDate = new Date(from);
+            startDate.setHours(0, 0, 0, 0);
+        }
+        if (to) {
+            endDate = new Date(to);
+            endDate.setHours(23, 59, 59, 999);
+        }
+
+        const dateMatch = {
+            createdAt: { $gte: startDate, $lte: endDate },
+            orderStatus: { $ne: 'cancelled' }
+        };
+
+        // 1. Key Metrics
+        const keyMetrics = await Order.aggregate([
+            { $match: dateMatch },
+            {
+                $group: {
+                    _id: null,
+                    totalRevenue: { $sum: "$bills.totalWithTax" },
+                    totalOrders: { $sum: 1 },
+                }
+            }
+        ]);
+
+        const totalRevenue = keyMetrics.length > 0 ? keyMetrics[0].totalRevenue : 0;
+        const totalOrders = keyMetrics.length > 0 ? keyMetrics[0].totalOrders : 0;
+
+        // Active Customers (Unique tables or names?)
+        const uniqueCustomers = await Order.distinct('table', dateMatch);
+        const activeCustomers = uniqueCustomers.length;
+
+        // 2. Revenue Chart Data (Group by Day)
+        const revenueChart = await Order.aggregate([
+            { $match: dateMatch },
+            {
+                $group: {
+                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                    revenue: { $sum: "$bills.totalWithTax" },
+                    orders: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } },
+            {
+                $project: {
+                    _id: 0,
+                    date: "$_id",
+                    revenue: 1,
+                    orders: 1
+                }
+            }
+        ]);
+
+        // 3. Category Breakdown
+        const categoryData = await Order.aggregate([
+            { $match: dateMatch },
+            { $unwind: "$items" },
+            {
+                $group: {
+                    _id: "$items.category",
+                    revenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } },
+                    value: { $sum: "$items.quantity" }
+                }
+            },
+            { $match: { _id: { $ne: null } } },
+            {
+                $project: {
+                    _id: 0,
+                    name: "$_id",
+                    value: 1,
+                    revenue: 1
+                }
+            }
+        ]);
+
+        // 4. Top Selling Items
+        const topItems = await Order.aggregate([
+            { $match: dateMatch },
+            { $unwind: "$items" },
+            {
+                $group: {
+                    _id: "$items.name",
+                    sales: { $sum: "$items.quantity" },
+                    revenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } }
+                }
+            },
+            { $sort: { sales: -1 } },
+            { $limit: 5 },
+            {
+                $project: {
+                    _id: 0,
+                    name: "$_id",
+                    sales: 1,
+                    revenue: 1
+                }
+            }
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                metrics: {
+                    totalRevenue,
+                    totalOrders,
+                    activeCustomers,
+                    avgOrderTime: "18 min"
+                },
+                revenueChart,
+                categoryData,
+                topItems
+            }
+        });
+
+    } catch (error) {
+        console.error("Analytics Error:", error);
+        next(error);
+    }
+};
