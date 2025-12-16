@@ -66,6 +66,7 @@ app.use("/api/category", require("./routes/categoryRoute"));
 app.use("/api/dish", require("./routes/dishRoute"));
 app.use("/api/upload", require("./routes/uploadRoute"));
 app.use("/api/dashboard", require("./routes/dashboardRoute"));
+app.use("/api/inventory", require("./routes/inventoryRoute"));
 
 // Global Error Handler
 app.use(globalErrorHandler);
