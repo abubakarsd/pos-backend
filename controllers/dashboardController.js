@@ -252,6 +252,42 @@ exports.getDashboardStats = async (req, res, next) => {
             .select('name price category')
             .limit(5);
 
+        // 6. Sales by Payment Method
+        const paymentMethodStats = await Order.aggregate([
+            { $match: salesMatch },
+            {
+                $group: {
+                    _id: "$paymentMethod",
+                    total: { $sum: "$bills.totalWithTax" }
+                }
+            }
+        ]);
+
+        const formatPaymentStats = (stats) => {
+            const result = {
+                cash: 0,
+                pos1: 0,
+                pos2: 0,
+                others: 0
+            };
+            stats.forEach(stat => {
+                if (stat._id === 'Cash') result.cash += stat.total;
+                else if (stat._id === 'Transfer - POS 1') result.pos1 += stat.total;
+                else if (stat._id === 'Transfer - POS 2') result.pos2 += stat.total;
+                else if (stat._id === 'Card - POS 1') result.pos1 += stat.total; // Map card to POS 1 as well if needed, or separate? Assuming merged for now based on 'Transfer to POS 1' requirement, but wait, 'Cash accepted, transfer to POS 1, POS 2'. 
+                // Let's stick to exact string matching from frontend or robust includes.
+                // Frontend sends: 'Cash', 'Card - POS 1', 'Card - POS 2', 'Transfer - POS 1', 'Transfer - POS 2'.
+                // User asked for: "list of cash accepted, transfer to POS 1, POS 2".
+                // I will aggregate by POS terminal for non-cash.
+                else if (stat._id && stat._id.includes('POS 1')) result.pos1 += stat.total;
+                else if (stat._id && stat._id.includes('POS 2')) result.pos2 += stat.total;
+                else result.others += stat.total;
+            });
+            return result;
+        };
+
+        const paymentStats = formatPaymentStats(paymentMethodStats);
+
         res.status(200).json({
             success: true,
             data: {
@@ -268,7 +304,8 @@ exports.getDashboardStats = async (req, res, next) => {
                     ...item,
                     revenue: `₦${item.revenue.toLocaleString()}`
                 })),
-                unavailableItems
+                unavailableItems,
+                paymentStats
             }
         });
     } catch (error) {
@@ -412,7 +449,35 @@ exports.getAnalyticsStats = async (req, res, next) => {
                 },
                 revenueChart,
                 categoryData,
-                topItems
+                topItems,
+                paymentStats: await (async () => {
+                    const paymentMethodStats = await Order.aggregate([
+                        { $match: dateMatch },
+                        {
+                            $group: {
+                                _id: "$paymentMethod",
+                                total: { $sum: "$bills.totalWithTax" }
+                            }
+                        }
+                    ]);
+
+                    const result = {
+                        cash: 0,
+                        pos1: 0,
+                        pos2: 0,
+                        others: 0
+                    };
+                    paymentMethodStats.forEach(stat => {
+                        if (stat._id === 'Cash') result.cash += stat.total;
+                        else if (stat._id === 'Transfer - POS 1') result.pos1 += stat.total;
+                        else if (stat._id === 'Transfer - POS 2') result.pos2 += stat.total;
+                        else if (stat._id === 'Card - POS 1') result.pos1 += stat.total;
+                        else if (stat._id && stat._id.includes('POS 1')) result.pos1 += stat.total;
+                        else if (stat._id && stat._id.includes('POS 2')) result.pos2 += stat.total;
+                        else result.others += stat.total;
+                    });
+                    return result;
+                })()
             }
         });
 
